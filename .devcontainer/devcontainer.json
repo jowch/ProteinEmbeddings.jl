@@ -11,13 +11,12 @@
 
 
 	// Add the IDs of extensions you want installed when the container is created.
-	"extensions": [
-		"ms-python.python",
-		"vscodevim.vim"
-	],
+	"extensions": [ "ms-python.python", "vscodevim.vim" ],
 
-	"runArgs": [
-		"--gpus", "all"
+	"runArgs": [ "--gpus", "all" ],
+
+	"mounts": [
+		"source=/data/databases,target=/data,type=bind"
 	],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
