@@ -3,7 +3,7 @@ import math
 import torch
 from torch import nn, Tensor
 
-from model import TransformerModel, generate_square_subsequent_mask
+from model import TransformerVAE
 from data import vocab, bptt, train_data, val_data, test_data, get_batch
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -15,7 +15,7 @@ d_hid = 200  # dimension of the feedforward network model in nn.TransformerEncod
 nlayers = 2  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
 nhead = 2  # number of heads in nn.MultiheadAttention
 dropout = 0.2  # dropout probability
-model = TransformerModel(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
+model = TransformerVAE(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
 import copy
 import time
@@ -30,16 +30,25 @@ def train(model: nn.Module) -> None:
     total_loss = 0.
     log_interval = 200
     start_time = time.time()
-    src_mask = generate_square_subsequent_mask(bptt).to(device)
+    src_mask = TransformerVAE.generate_square_subsequent_mask(bptt).to(device)
 
     num_batches = len(train_data) // bptt
     for batch, i in enumerate(range(0, train_data.size(0) - 1, bptt)):
         data, targets = get_batch(train_data, i)
+
+        # print(f'data: {data.shape}, target: {targets.shape}')
+
         batch_size = data.size(0)
         if batch_size != bptt:  # only on last batch
             src_mask = src_mask[:batch_size, :batch_size]
-        output = model(data, src_mask)
-        loss = criterion(output.view(-1, ntokens), targets)
+
+        output, mu, log_var = model(data, targets, src_mask=src_mask)
+        loss = model.criterion(output, targets, mu, log_var)
+
+        # output = model(data, src_mask=src_mask)
+        # print(f'recon: {output.view(-1, ntokens).shape}, target: {targets.shape}')
+        # loss = criterion(output.view(-1, ntokens), targets.reshape(-1))
+        # print(loss)
 
         optimizer.zero_grad()
         loss.backward()
@@ -62,17 +71,33 @@ def train(model: nn.Module) -> None:
 def evaluate(model: nn.Module, eval_data: Tensor) -> float:
     model.eval()  # turn on evaluation mode
     total_loss = 0.
-    src_mask = generate_square_subsequent_mask(bptt).to(device)
+    src_mask = TransformerVAE.generate_square_subsequent_mask(bptt).to(device)
     with torch.no_grad():
         for i in range(0, eval_data.size(0) - 1, bptt):
             data, targets = get_batch(eval_data, i)
             batch_size = data.size(0)
             if batch_size != bptt:
                 src_mask = src_mask[:batch_size, :batch_size]
-            output = model(data, src_mask)
-            output_flat = output.view(-1, ntokens)
-            total_loss += batch_size * criterion(output_flat, targets).item()
+            # output = model(data, src_mask)
+            output, mu, log_var = model(data, targets, src_mask=src_mask)
+            loss = model.criterion(output, targets, mu, log_var)
+            total_loss += batch_size * loss.item()
     return total_loss / (len(eval_data) - 1)
+
+def predict(model: nn.Module, input: Tensor):
+    model.eval()
+    src_mask = TransformerVAE.generate_square_subsequent_mask(bptt).to(device)
+
+    with torch.no_grad():
+        data, targets = get_batch(input, 0)
+        batch_size = data.size(0)
+        if batch_size != bptt:
+            src_mask = src_mask[:batch_size, :batch_size]
+        # output = model(data, src_mask)
+        output, _, _ = model(data, targets, src_mask=src_mask)
+
+    return output
+
 
 best_val_loss = float('inf')
 epochs = 3

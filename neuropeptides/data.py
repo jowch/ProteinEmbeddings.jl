@@ -67,5 +67,5 @@ def get_batch(source: Tensor, i: int) -> Tuple[Tensor, Tensor]:
     """
     seq_len = min(bptt, len(source) - 1 - i)
     data = source[i:i+seq_len]
-    target = source[i+1:i+1+seq_len].reshape(-1)
+    target = source[i+1:i+1+seq_len]
     return data, target
