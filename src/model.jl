@@ -1,5 +1,3 @@
-const torch = pyimport("torch")
-
 """
     ProteinEmbedder()
 
@@ -29,6 +27,7 @@ struct ProteinEmbedder
 end
 
 function ProteinEmbedder()
+    torch = pyimport("torch")
     esm = pyimport("esm")
 
     model, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
@@ -68,6 +67,8 @@ function (embedder::ProteinEmbedder)(sequences::Vector{String})
     # end
 
     py"""
+    import pytorch
+
     with $torch.no_grad():
         results = $(embedder.model)($tokens, repr_layers=[33], return_contacts=True)
     """
