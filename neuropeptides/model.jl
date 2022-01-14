@@ -4,6 +4,9 @@ import Statistics: mean
 using PyCall
 using BioSequences
 
+
+const torch = pyimport("torch")
+
 """
     ProteinEmbedder()
 
@@ -29,6 +32,7 @@ struct ProteinEmbedder
     name::String
     model::PyObject
     batch_converter::PyObject
+    use_gpu::Bool
 end
 
 function ProteinEmbedder()
@@ -37,11 +41,17 @@ function ProteinEmbedder()
     model, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
     batch_converter = alphabet.get_batch_converter()
 
-    ProteinEmbedder("ESM-1b", model, batch_converter)
+    use_gpu = torch.cuda.is_available()
+
+    if use_gpu
+        model = model.cuda()
+    end
+
+    ProteinEmbedder("ESM-1b", model, batch_converter, use_gpu)
 end
 
 function show(io::IO, embedder::ProteinEmbedder)
-    print(io, "ProteinEmbedder(model = $(embedder.name))")
+    print(io, "ProteinEmbedder(model = $(embedder.name), gpu = $(embedder.use_gpu))")
 end
 
 function (embedder::ProteinEmbedder)(sequences::Vector{String})
@@ -49,25 +59,27 @@ function (embedder::ProteinEmbedder)(sequences::Vector{String})
         ("", sequence)
     end
 
-    _, _, batch_tokens = embedder.batch_converter(data)
+    embedder.model.eval()
+
+    _, _, tokens = embedder.batch_converter(data)
+
+    if embedder.use_gpu
+        tokens = tokens.to(device = "cuda", non_blocking = true)
+    end
 
     # TODO: replace current implementation with this one. Julia variables aren't
     # assigned in @pywith blocks at the moment.
-
-    # torch = pyimport("torch")
 
     # @pywith torch.no_grad() begin
     #     results = embedder.model(batch_tokens, repr_layers=[33], return_contacts=true)
     # end
 
     py"""
-    import torch
-
-    with torch.no_grad():
-        results = $(embedder.model)($batch_tokens, repr_layers=[33], return_contacts=True)
+    with $torch.no_grad():
+        results = $(embedder.model)($tokens, repr_layers=[33], return_contacts=True)
     """
 
-    token_representations = py"results"["representations"][33].numpy()
+    token_representations = py"results"["representations"][33].cpu().numpy()
 
     representations = zeros(length(sequences), size(token_representations, 3))
 
