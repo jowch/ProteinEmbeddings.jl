@@ -1,3 +1,8 @@
+name = "ProteinEmbeddings"
+uuid = "a7927cc2-2358-47e8-a213-49500dd82299"
+authors = ["Jonathan Chen <jwhc@ucla.edu>"]
+version = "0.1.0"
+
 [deps]
 BioSequences = "7e6ae17a-c86d-528c-b3b9-7f778a29fe59"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
