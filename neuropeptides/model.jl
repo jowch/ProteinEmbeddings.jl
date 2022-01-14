@@ -16,7 +16,13 @@ facebookresearch/esm (Rives, et al.). It can be called like a function.
 julia> embed = ProteinEmbedder()
 ProteinEmbedder(model = ESM-1b)
 
-julia> embed(aa"")
+julia> embed(aa"LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES")
+1-element Vector{Matrix{Float32}}:
+ [-1.239253f-5 0.06010988 … 0.11572349 0.01225175]
+
+julia> embed("K A <mask> I S Q")
+1-element Vector{Matrix{Float32}}:
+ [-0.051009744 -0.3597334 … 0.33589444 -0.34698522]
 ```
 """
 struct ProteinEmbedder
