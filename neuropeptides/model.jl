@@ -44,7 +44,11 @@ function show(io::IO, embedder::ProteinEmbedder)
     print(io, "ProteinEmbedder(model = $(embedder.name))")
 end
 
-function (embedder::ProteinEmbedder)(data::Vector{Tuple{String, String}})
+function (embedder::ProteinEmbedder)(sequences::Vector{String})
+    data = map(sequences) do sequence
+        ("", sequence)
+    end
+
     _, _, batch_tokens = embedder.batch_converter(data)
 
     # TODO: replace current implementation with this one. Julia variables aren't
@@ -64,23 +68,24 @@ function (embedder::ProteinEmbedder)(data::Vector{Tuple{String, String}})
     """
 
     token_representations = py"results"["representations"][33].numpy()
-    sequence_representations = map(enumerate(data)) do (i, (_, seq))
-        mean(token_representations[i, 2 : length(seq) + 1, :]; dims = 1)
+
+    representations = zeros(length(sequences), size(token_representations, 3))
+
+    for (i, sequence) in enumerate(sequences)
+        representations[i, :] = mean(token_representations[i, 2 : length(sequence) + 1, :]; dims = 1)
     end
 
-    sequence_representations
+    representations
 end
 
-function (embedder::ProteinEmbedder)(data::Vector{Tuple{String, LongAA}})
-    embedder(map(data) do (name, sequence)
-        (name, string(sequence))
-    end)
+function (embedder::ProteinEmbedder)(sequences::Vector{LongAA})
+    embedder(string.(sequences))
 end
 
-function (embedder::ProteinEmbedder)(sequence::LongAA, name::String = "")
-    embedder(string(sequence), name)
+function (embedder::ProteinEmbedder)(sequence::LongAA)
+    embedder(string(sequence))
 end
 
-function (embedder::ProteinEmbedder)(sequence::String, name::String = "")
-    embedder([(name, sequence)])
+function (embedder::ProteinEmbedder)(sequence::String)
+    embedder([sequence])
 end
