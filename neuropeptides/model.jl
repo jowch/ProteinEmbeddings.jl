@@ -4,7 +4,21 @@ import Statistics: mean
 using PyCall
 using BioSequences
 
+"""
+    ProteinEmbedder()
 
+A struct that can be used as a function to compute peptide sequence embeddings.
+This struct contains `PyObject` references to the ESM-1b PyTorch model from
+facebookresearch/esm (Rives, et al.). It can be called like a function.
+
+# Examples
+```julia-repl
+julia> embed = ProteinEmbedder()
+ProteinEmbedder(model = ESM-1b)
+
+julia> embed(aa"")
+```
+"""
 struct ProteinEmbedder
     name::String
     model::PyObject
@@ -17,18 +31,14 @@ function ProteinEmbedder()
     model, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
     batch_converter = alphabet.get_batch_converter()
 
-    ProteinEmbedder("esm1b_t33_650M_UR50S", model, batch_converter)
+    ProteinEmbedder("ESM-1b", model, batch_converter)
 end
 
 function show(io::IO, embedder::ProteinEmbedder)
     print(io, "ProteinEmbedder(model = $(embedder.name))")
 end
 
-function (embedder::ProteinEmbedder)(data::Vector{Tuple{String, LongAA}})
-    data = map(data) do (name, seq)
-        (name, String(seq))
-    end
-
+function (embedder::ProteinEmbedder)(data::Vector{Tuple{String, String}})
     _, _, batch_tokens = embedder.batch_converter(data)
 
     # TODO: replace current implementation with this one. Julia variables aren't
@@ -55,10 +65,16 @@ function (embedder::ProteinEmbedder)(data::Vector{Tuple{String, LongAA}})
     sequence_representations
 end
 
-function (embedder::ProteinEmbedder)(sequence::LongAA, name::String = "")
-    embedder([(name, sequence)])
+function (embedder::ProteinEmbedder)(data::Vector{Tuple{String, LongAA}})
+    embedder(map(data) do (name, sequence)
+        (name, string(sequence))
+    end)
 end
 
-@pywith pybuiltin("open")("Manifest.toml","r") as f begin
-    manifest = f.readlines()
+function (embedder::ProteinEmbedder)(sequence::LongAA, name::String = "")
+    embedder(string(sequence), name)
+end
+
+function (embedder::ProteinEmbedder)(sequence::String, name::String = "")
+    embedder([(name, sequence)])
 end
