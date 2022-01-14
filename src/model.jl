@@ -21,74 +21,84 @@ julia> embed("K A <mask> I S Q")
 """
 struct ProteinEmbedder
     name::String
-    model::PyObject
-    batch_converter::PyObject
+    embed::PyObject
     use_gpu::Bool
 end
 
 function ProteinEmbedder()
-    torch = pyimport("torch")
-    esm = pyimport("esm")
+    py"""
+    import torch
+    import esm
 
     model, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
     batch_converter = alphabet.get_batch_converter()
 
     use_gpu = torch.cuda.is_available()
 
-    if use_gpu
+    if use_gpu:
         model = model.cuda()
-    end
 
-    ProteinEmbedder("ESM-1b", model, batch_converter, use_gpu)
+    def embed(data):
+        _, _, tokens = batch_converter(data)
+
+        if use_gpu:
+            tokens = tokens.to(device = "cuda", non_blocking = True)
+
+        model.eval()
+
+        with torch.no_grad():
+            results = model(tokens, repr_layers=[33], return_contacts=False)
+
+        return results["representations"][33].cpu().numpy()
+    """
+
+    ProteinEmbedder("ESM-1b", py"embed", py"use_gpu")
 end
 
 function show(io::IO, embedder::ProteinEmbedder)
     print(io, "ProteinEmbedder(model = $(embedder.name), gpu = $(embedder.use_gpu))")
 end
 
-function (embedder::ProteinEmbedder)(sequences::Vector{String})
-    data = map(sequences) do sequence
-        ("", sequence)
+function _embed_sequences(embedder::ProteinEmbedder, data::AbstractArray{Tuple{String, String}, 1})
+    token_representations = embedder.embed(data)
+    embeddings = zeros(length(data), size(token_representations, 3))
+
+    for (i, (_, sequence)) in enumerate(data)
+        embeddings[i, :] = mean(token_representations[i, 2 : length(sequence) + 1, :]; dims = 1)
     end
 
-    embedder.model.eval()
-
-    _, _, tokens = embedder.batch_converter(data)
-
-    if embedder.use_gpu
-        tokens = tokens.to(device = "cuda", non_blocking = true)
-    end
-
-    # TODO: replace current implementation with this one. Julia variables aren't
-    # assigned in @pywith blocks at the moment.
-
-    # @pywith torch.no_grad() begin
-    #     results = embedder.model(batch_tokens, repr_layers=[33], return_contacts=true)
-    # end
-
-    py"""
-    import pytorch
-
-    with $torch.no_grad():
-        results = $(embedder.model)($tokens, repr_layers=[33], return_contacts=True)
-    """
-
-    token_representations = py"results"["representations"][33].cpu().numpy()
-
-    representations = zeros(length(sequences), size(token_representations, 3))
-
-    for (i, sequence) in enumerate(sequences)
-        representations[i, :] = mean(token_representations[i, 2 : length(sequence) + 1, :]; dims = 1)
-    end
-
-    representations
+    embeddings
 end
 
-function (embedder::ProteinEmbedder)(sequences::Vector{LongAA})
+function (embedder::ProteinEmbedder)(sequences::Vector{String}, seqs_per_batch = 25)
+    data = map(sequences) do sequence
+        if length(sequence) > 1024
+            @warn "Truncating sequence: $sequence"
+            ("", sequence[1:1022])
+        else
+            ("", sequence)
+        end
+    end
+
+    if length(sequences) > seqs_per_batch
+        batches = [view(data, i:min(i+seqs_per_batch-1, length(sequences)))
+                   for i = 1:seqs_per_batch:length(sequences)]
+
+        representations = map(enumerate(batches)) do (i, batch)
+            _embed_sequences(embedder, batch)
+        end
+
+        return vcat(representations...)
+    else
+        return _embed_sequences(embedder, data)
+    end
+end
+
+function (embedder::ProteinEmbedder)(sequences::Vector{LongSequence{AminoAcidAlphabet}})
     embedder(string.(sequences))
 end
 
-function (embedder::ProteinEmbedder)(sequence::LongAA)
+function (embedder::ProteinEmbedder)(sequence::LongSequence{AminoAcidAlphabet})
     embedder(string(sequence))
 end
 
