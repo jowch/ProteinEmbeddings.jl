@@ -9,34 +9,43 @@ from torch.nn import (TransformerEncoder, TransformerEncoderLayer,
 from torch.nn.init import kaiming_normal_
 
 class TransformerVAE(nn.Module):
-    def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int,
-                 nlayers: int, dropout: float = 0.5):
+    """
+    Transformer Variational Autoencoder 
+    """
+    def __init__(self,
+                 vocab_size: int,
+                 num_heads: int,
+                 num_layers: int,
+                 d_model: int,
+                 d_feedforward: int,
+                 d_latent: int,
+                 dropout: float = 0.5):
+
         super().__init__()
+
         self.model_type = 'Transformer'
         self.d_model = d_model
-        self.nhead = nhead
-        self.ntoken = ntoken
+        self.num_heads = num_heads
+        self.vocab_size = vocab_size
 
-        self.encoder = nn.Embedding(ntoken, d_model)
+        self.encoder = nn.Embedding(vocab_size, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
 
-        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        encoder_layers = TransformerEncoderLayer(d_model, num_heads, d_feedforward, dropout)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, num_layers)
 
-        self.mu = nn.Linear(d_model, ntoken)
-        self.log_var = nn.Linear(d_model, ntoken)
+        self.mu = nn.Linear(d_model, vocab_size)
+        self.log_var = nn.Linear(d_model, vocab_size)
 
-        self.latent_decoder = nn.Linear(ntoken, d_model)
+        self.latent_decoder = nn.Linear(vocab_size, d_model)
 
-        decoder_layer = TransformerDecoderLayer(d_model, nhead, d_hid, dropout)
-        self.transformer_decoder = TransformerDecoder(decoder_layer, nlayers)
+        decoder_layer = TransformerDecoderLayer(d_model, num_heads, d_feedforward, dropout)
+        self.transformer_decoder = TransformerDecoder(decoder_layer, num_layers)
 
         self.decoder = nn.Sequential(
-            nn.Linear(d_model, ntoken),
+            nn.Linear(d_model, vocab_size),
             nn.LogSoftmax(dim=1)
         )
-
-        # self.decoder = nn.Linear(d_model, ntoken)
 
         self.init_weights()
 
@@ -95,8 +104,7 @@ class TransformerVAE(nn.Module):
         return eps * std + mu
 
     def criterion(self, recon: Tensor, targets: Tensor, mu: Tensor, log_var: Tensor):
-        ce = F.cross_entropy(recon.view(-1, self.ntoken), targets.reshape(-1))
-        # kl_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+        ce = F.cross_entropy(recon.view(-1, self.vocab_size), targets.reshape(-1))
         kld = (-0.5 * torch.sum(log_var - torch.pow(mu, 2) - torch.exp(log_var) + 1, 1)).mean().squeeze()
 
         return ce + kld
