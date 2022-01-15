@@ -29,6 +29,7 @@ function ProteinEmbedder()
     py"""
     import torch
     import esm
+    import numpy as np
 
     model, alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
     batch_converter = alphabet.get_batch_converter()
@@ -38,18 +39,40 @@ function ProteinEmbedder()
     if use_gpu:
         model = model.cuda()
 
-    def embed(data):
+    batch_size = 25
+
+    def get_batches(data):
+        for i in range(0, len(data), batch_size):
+            yield data[i:min(i + batch_size, len(data))]
+
+    def _embed_batched(data):
+        model.eval()
         _, _, tokens = batch_converter(data)
 
         if use_gpu:
             tokens = tokens.to(device = "cuda", non_blocking = True)
 
-        model.eval()
-
         with torch.no_grad():
             results = model(tokens, repr_layers=[33], return_contacts=False)
 
-        return results["representations"][33].cpu().numpy()
+        token_representations = results["representations"][33].cpu()
+        embeddings = np.zeros((len(data), token_representations.shape[2]))
+
+        for i, (_, sequence) in enumerate(data):
+            embeddings[i, :] = token_representations[i, 1:len(sequence) + 1].mean(0).numpy()
+
+        return embeddings
+
+    def embed(data):
+        model.eval()
+
+        try:
+            if len(data) > batch_size:
+                return np.vstack([_embed_batched(batch) for batch in get_batches(data)])
+            else:
+                return _embed_batched(data)
+        except Exception as e:
+            print(e)
     """
 
     ProteinEmbedder("ESM-1b", py"embed", py"use_gpu")
@@ -57,17 +80,6 @@ end
 
 function show(io::IO, embedder::ProteinEmbedder)
     print(io, "ProteinEmbedder(model = $(embedder.name), gpu = $(embedder.use_gpu))")
-end
-
-function _embed_sequences(embedder::ProteinEmbedder, data::AbstractArray{Tuple{String, String}, 1})
-    token_representations = embedder.embed(data)
-    embeddings = zeros(length(data), size(token_representations, 3))
-
-    for (i, (_, sequence)) in enumerate(data)
-        embeddings[i, :] = mean(token_representations[i, 2 : length(sequence) + 1, :]; dims = 1)
-    end
-
-    embeddings
 end
 
 function (embedder::ProteinEmbedder)(sequences::Vector{String}, seqs_per_batch = 25)
@@ -80,18 +92,7 @@ function (embedder::ProteinEmbedder)(sequences::Vector{String}, seqs_per_batch =
         end
     end
 
-    if length(sequences) > seqs_per_batch
-        batches = [view(data, i:min(i+seqs_per_batch-1, length(sequences)))
-                   for i = 1:seqs_per_batch:length(sequences)]
-
-        representations = map(enumerate(batches)) do (i, batch)
-            _embed_sequences(embedder, batch)
-        end
-
-        return vcat(representations...)
-    else
-        return _embed_sequences(embedder, data)
-    end
+    embedder.embed(data)
 end
 
 function (embedder::ProteinEmbedder)(sequences::Vector{LongSequence{AminoAcidAlphabet}})
