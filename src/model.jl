@@ -66,13 +66,10 @@ function ProteinEmbedder()
     def embed(data):
         model.eval()
 
-        try:
-            if len(data) > batch_size:
-                return np.vstack([_embed_batched(batch) for batch in get_batches(data)])
-            else:
-                return _embed_batched(data)
-        except Exception as e:
-            print(e)
+        if len(data) > batch_size:
+            return np.vstack([_embed_batched(batch) for batch in get_batches(data)])
+        else:
+            return _embed_batched(data)
     """
 
     ProteinEmbedder("ESM-1b", py"embed", py"use_gpu")
