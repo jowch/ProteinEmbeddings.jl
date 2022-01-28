@@ -1,3 +1,5 @@
+AASequence = LongSequence{AminoAcidAlphabet}
+
 """
     ProteinEmbedder()
 
@@ -22,6 +24,7 @@ julia> embed("K A <mask> I S Q")
 struct ProteinEmbedder
     name::String
     embed::PyObject
+    contact::PyObject
     use_gpu::Bool
 end
 
@@ -60,12 +63,21 @@ function ProteinEmbedder()
 
         for i, (_, sequence) in enumerate(data):
             embeddings[i, :] = token_representations[i, 1:len(sequence) + 1].mean(0).numpy()
-            contacts.append(token_representations)
 
         if return_contacts:
             return embeddings, results["contacts"].cpu()
         else:
             return embeddings
+
+    def _contact_batched(data):
+        model.eval()
+        _, _, tokens = batch_converter(data)
+
+        if use_gpu:
+            tokens = tokens.to(device = "cuda", non_blocking=True)
+
+        with torch.no_grad():
+            return model.predict_contacts(tokens).cpu().numpy()
 
     def embed(data):
         model.eval()
@@ -74,16 +86,24 @@ function ProteinEmbedder()
             return np.vstack([_embed_batched(batch) for batch in get_batches(data)])
         else:
             return _embed_batched(data)
+
+    def contact(data):
+        model.eval()
+
+        if len(data) > batch_size:
+            return np.vstack([_contact_batched(batch) for batch in get_batches(data)])
+        else:
+            return _contact_batched(data)
     """
 
-    ProteinEmbedder("ESM-1b", py"embed", py"use_gpu")
+    ProteinEmbedder("ESM-1b", py"embed", py"contact", py"use_gpu")
 end
 
 function show(io::IO, embedder::ProteinEmbedder)
     print(io, "ProteinEmbedder(model = $(embedder.name), gpu = $(embedder.use_gpu))")
 end
 
-function (embedder::ProteinEmbedder)(sequences::Vector{String}, seqs_per_batch = 25)
+function (embedder::ProteinEmbedder)(sequences::Vector{String})
     data = map(sequences) do sequence
         if length(sequence) > 1024
             @warn "Truncating sequence: $sequence"
@@ -96,14 +116,39 @@ function (embedder::ProteinEmbedder)(sequences::Vector{String}, seqs_per_batch =
     embedder.embed(data)
 end
 
-function (embedder::ProteinEmbedder)(sequences::Vector{LongSequence{AminoAcidAlphabet}})
+function (embedder::ProteinEmbedder)(sequences::Vector{AASequence})
     embedder(string.(sequences))
 end
 
-function (embedder::ProteinEmbedder)(sequence::LongSequence{AminoAcidAlphabet})
+function (embedder::ProteinEmbedder)(sequence::AASequence)
     embedder(string(sequence))
 end
 
 function (embedder::ProteinEmbedder)(sequence::String)
     embedder([sequence])
+end
+
+function contact(embedder::ProteinEmbedder, sequences::Vector{String})
+    data = map(sequences) do sequence
+        if length(sequence) > 1024
+            @warn "Truncating sequence: $sequence"
+            ("", sequence[1:1022])
+        else
+            ("", sequence)
+        end
+    end
+    
+    embedder.contact(data)
+end
+
+function contact(embedder::ProteinEmbedder, sequence::String)
+    contact(embedder, [sequence])
+end
+
+function contact(embedder::ProteinEmbedder, sequence::AASequence)
+    contact(embedder, [string(sequence)])
+end
+
+function contact(embedder::ProteinEmbedder, sequences::Vector{AASequence})
+    contact(embedder, string.(sequences))
 end
