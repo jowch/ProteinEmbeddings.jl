@@ -45,23 +45,27 @@ function ProteinEmbedder()
         for i in range(0, len(data), batch_size):
             yield data[i:min(i + batch_size, len(data))]
 
-    def _embed_batched(data):
+    def _embed_batched(data, return_contacts=False):
         model.eval()
         _, _, tokens = batch_converter(data)
 
         if use_gpu:
-            tokens = tokens.to(device = "cuda", non_blocking = True)
+            tokens = tokens.to(device = "cuda", non_blocking=True)
 
         with torch.no_grad():
-            results = model(tokens, repr_layers=[33], return_contacts=False)
+            results = model(tokens, repr_layers=[33], return_contacts=return_contacts)
 
         token_representations = results["representations"][33].cpu()
         embeddings = np.zeros((len(data), token_representations.shape[2]))
 
         for i, (_, sequence) in enumerate(data):
             embeddings[i, :] = token_representations[i, 1:len(sequence) + 1].mean(0).numpy()
+            contacts.append(token_representations)
 
-        return embeddings
+        if return_contacts:
+            return embeddings, results["contacts"].cpu()
+        else:
+            return embeddings
 
     def embed(data):
         model.eval()
