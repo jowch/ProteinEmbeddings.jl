@@ -7,7 +7,7 @@ using PyCall
 using BioSequences
 
 
-export ProteinEmbedder, show
+export ProteinEmbedder, show, embed, contact
 
 include("model.jl")
 

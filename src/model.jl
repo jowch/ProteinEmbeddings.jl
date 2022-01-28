@@ -103,7 +103,7 @@ function show(io::IO, embedder::ProteinEmbedder)
     print(io, "ProteinEmbedder(model = $(embedder.name), gpu = $(embedder.use_gpu))")
 end
 
-function (embedder::ProteinEmbedder)(sequences::Vector{String})
+function embed(embedder::ProteinEmbedder, sequences::Vector{String})
     data = map(sequences) do sequence
         if length(sequence) > 1024
             @warn "Truncating sequence: $sequence"
@@ -116,15 +116,15 @@ function (embedder::ProteinEmbedder)(sequences::Vector{String})
     embedder.embed(data)
 end
 
-function (embedder::ProteinEmbedder)(sequences::Vector{AASequence})
+function embed(embedder::ProteinEmbedder, sequences::Vector{AASequence})
     embedder(string.(sequences))
 end
 
-function (embedder::ProteinEmbedder)(sequence::AASequence)
+function embed(embedder::ProteinEmbedder, sequence::AASequence)
     embedder(string(sequence))
 end
 
-function (embedder::ProteinEmbedder)(sequence::String)
+function embed(embedder::ProteinEmbedder, sequence::String)
     embedder([sequence])
 end
 
