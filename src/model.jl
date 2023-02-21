@@ -117,15 +117,15 @@ function embed(embedder::ProteinEmbedder, sequences::Vector{String})
 end
 
 function embed(embedder::ProteinEmbedder, sequences::Vector{AASequence})
-    embedder(string.(sequences))
+    embed(embedder, string.(sequences))
 end
 
 function embed(embedder::ProteinEmbedder, sequence::AASequence)
-    embedder(string(sequence))
+    embed(embedder, string(sequence))
 end
 
 function embed(embedder::ProteinEmbedder, sequence::String)
-    embedder([sequence])
+    embed(embedder, [sequence])
 end
 
 function contact(embedder::ProteinEmbedder, sequences::Vector{String})
