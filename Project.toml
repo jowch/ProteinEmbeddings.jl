@@ -1,7 +1,7 @@
 name = "ProteinEmbeddings"
 uuid = "a7927cc2-2358-47e8-a213-49500dd82299"
 authors = ["Jonathan Chen <jwhc@ucla.edu>"]
-version = "0.1.1"
+version = "0.2.0"
 
 [deps]
 BioSequences = "7e6ae17a-c86d-528c-b3b9-7f778a29fe59"
