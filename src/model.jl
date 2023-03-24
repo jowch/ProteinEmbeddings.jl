@@ -1,5 +1,3 @@
-AASequence = LongSequence{AminoAcidAlphabet}
-
 abstract type Model end
 abstract type ESM1B_T33_650M_UR50S <: Model end
 const ESM1 = ESM1B_T33_650M_UR50S

@@ -1,10 +1,8 @@
 module ProteinEmbeddings
 
 import Base: show
-import Statistics: mean
 
 using PyCall
-using BioSequences
 
 export
 # models
@@ -15,6 +13,7 @@ ESM1B_T33_650M_UR50S,
 ESM2,
 ESM2_T33_650M_UR50D,
 
+# embedder
 ProteinEmbedder, embed, show
 
 
