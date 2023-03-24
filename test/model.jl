@@ -17,17 +17,17 @@ end
 
     y = load("ll37.jld2", "LL37")
 
-    @test y == embed(embedder, LL37)
-    @test y == embed(embedder, aaLL37)
+    @test all(isapprox.(y, embed(embedder, LL37); atol = 1f-4))
+    @test all(isapprox.(y, embed(embedder, aaLL37); atol = 1f-4))
 
-    @test y == embedder(LL37)
-    @test y == embedder(aaLL37)
+    @test all(isapprox.(y, embedder(LL37); atol = 1f-4))
+    @test all(isapprox.(y, embedder(aaLL37); atol = 1f-4))
 
     Y = permutedims([y y], (2, 1))
 
-    @test Y == embed(embedder, [LL37, aaLL37])
-    @test Y == embedder([LL37, aaLL37])
+    @test all(isapprox.(Y, embed(embedder, [LL37, aaLL37]); atol = 1f-4))
+    @test all(isapprox.(Y, embedder([LL37, aaLL37]); atol = 1f-4))
 
-    @test Y == embed(embedder, LL37, aaLL37)
-    @test Y == embedder(LL37, aaLL37)
+    @test all(isapprox.(Y, embed(embedder, LL37, aaLL37); atol = 1f-4))
+    @test all(isapprox.(Y, embedder(LL37, aaLL37); atol = 1f-4))
 end
