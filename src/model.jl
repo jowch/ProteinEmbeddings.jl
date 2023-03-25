@@ -5,8 +5,7 @@ const ESM1 = ESM1B_T33_650M_UR50S
 abstract type ESM2_T33_650M_UR50D <: Model end
 abstract type ESM2_T36_3B_UR50D <: Model end
 abstract type ESM2_T48_15B_UR50D <: Model end
-# const ESM2 = ESM2_T33_650M_UR50D
-const ESM2 = ESM2_T36_3B_UR50D
+const ESM2 = ESM2_T33_650M_UR50D
 
 
 """
