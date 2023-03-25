@@ -3,7 +3,11 @@ abstract type ESM1B_T33_650M_UR50S <: Model end
 const ESM1 = ESM1B_T33_650M_UR50S
 
 abstract type ESM2_T33_650M_UR50D <: Model end
-const ESM2 = ESM2_T33_650M_UR50D
+abstract type ESM2_T36_3B_UR50D <: Model end
+abstract type ESM2_T48_15B_UR50D <: Model end
+# const ESM2 = ESM2_T33_650M_UR50D
+const ESM2 = ESM2_T36_3B_UR50D
+
 
 """
     modelname(M <: Model)
@@ -12,6 +16,8 @@ Returns the name of the model represented by the type `M` in python.
 """
 @inline modelname(::Type{ESM1B_T33_650M_UR50S}) = "esm1b_t33_650M_UR50S" 
 @inline modelname(::Type{ESM2_T33_650M_UR50D}) = "esm2_t33_650M_UR50D"
+@inline modelname(::Type{ESM2_T36_3B_UR50D}) = "esm2_t36_3B_UR50D"
+@inline modelname(::Type{ESM2_T48_15B_UR50D}) = "esm2_t48_15B_UR50D"
 
 """
     modeldims(M <: Model)
@@ -20,6 +26,8 @@ Returns the embedding dimension of the model represented by the type `M` in pyth
 """
 @inline modeldims(::Type{ESM1B_T33_650M_UR50S}) = 1280
 @inline modeldims(::Type{ESM2_T33_650M_UR50D}) = 1280
+@inline modeldims(::Type{ESM2_T36_3B_UR50D}) = 2560
+@inline modeldims(::Type{ESM2_T48_15B_UR50D}) = 5120
 
 """
     ProteinEmbedder{<:Model}()
@@ -85,7 +93,7 @@ end
 
 @inline _embed(embedder::ProteinEmbedder, xs...) = _embed(embedder, collect(xs))
 @inline _embed(embedder::ProteinEmbedder, sequence) =
-    _embed(embedder, [_format(sequence)])[1, :]
+    _embed(embedder, [_format(sequence)])[:, 1]
 
 @inline _embed(embedder::ProteinEmbedder, sequences::AbstractVector) =
     _embed(embedder, _format.(sequences))

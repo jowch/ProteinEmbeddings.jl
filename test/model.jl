@@ -6,7 +6,6 @@ using FileIO, JLD2
 
     @test typeof(embedder) == ProteinEmbedder{ESM2_T33_650M_UR50D}
     @test typeof(embedder) == typeof(another_embedder)
-
 end
 
 @testset "Embed" begin
@@ -23,7 +22,7 @@ end
     @test all(isapprox.(y, embedder(LL37); atol = 1f-4))
     @test all(isapprox.(y, embedder(aaLL37); atol = 1f-4))
 
-    Y = permutedims([y y], (2, 1))
+    Y = [y y]
 
     @test all(isapprox.(Y, embed(embedder, [LL37, aaLL37]); atol = 1f-4))
     @test all(isapprox.(Y, embedder([LL37, aaLL37]); atol = 1f-4))
