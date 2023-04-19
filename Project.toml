@@ -1,9 +1,18 @@
 name = "ProteinEmbeddings"
 uuid = "a7927cc2-2358-47e8-a213-49500dd82299"
 authors = ["Jonathan Chen <jwhc@ucla.edu>"]
-version = "0.2.2"
+version = "0.3.0"
 
 [deps]
 Conda = "8f4d0f93-b110-5947-807f-2305c1781a2d"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+
+[weakdeps]
+BioSequences = "7e6ae17a-c86d-528c-b3b9-7f778a29fe59"
+
+[extensions]
+BioSequencesExt = "BioSequences"
+
+[compat]
+julia = "1.9"

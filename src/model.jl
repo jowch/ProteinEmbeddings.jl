@@ -74,7 +74,7 @@ function show(io::IO, ::ProteinEmbedder{M}) where {M}
     print(io, "ProteinEmbedder{$(M)}")
 end
 
-@inline (model::ProteinEmbedder)(xs...) = _embed(model, xs...)
+@inline (model::ProteinEmbedder)(xs...; kwargs...) = _embed(model, xs...; kwargs...)
 
 """
     embed(model::ProteinEmbedder, x)
@@ -82,20 +82,34 @@ end
 Computes an embedding using the `model`. Input `x` can be any string-like type
 or array of string-like types. If `x` is a single sequence, the embedding is
 returned as a vector. If `x` is an array of `n` sequences, the embedding is returned
-as an `n` x d matrix of embeddings.
+as an d x `n` matrix of embeddings.
 """
-@inline embed(model::ProteinEmbedder, xs...) = _embed(model, xs...)
+@inline embed(model::ProteinEmbedder, xs...; kwargs...) = _embed(model, xs...; kwargs...)
 
 function _embed(embedder::ProteinEmbedder, sequence::AbstractVector{Tuple{String, String}})
     embedder.model.embed(sequence)
 end
 
-@inline _embed(embedder::ProteinEmbedder, xs...) = _embed(embedder, collect(xs))
+@inline _embed(embedder::ProteinEmbedder, xs...; kwargs...) = _embed(embedder, collect(xs); kwargs...)
 @inline _embed(embedder::ProteinEmbedder, sequence) =
     _embed(embedder, [_format(sequence)])[:, 1]
 
-@inline _embed(embedder::ProteinEmbedder, sequences::AbstractVector) =
-    _embed(embedder, _format.(sequences))
+function _embed(embedder::ProteinEmbedder{M}, sequences::AbstractVector; batch_size = 500) where {M<:Model}
+    # if there are more sequences than the batch size, we need to split the
+    # sequences into batches and process each batch separately
+    if length(sequences) > batch_size
+        embeddings = Array{Float32}(undef, modeldims(M), length(sequences))
 
-@inline _format(sequence) = _format(string(sequence))
-@inline _format(sequence::String) = (string(), sequence)
+        for (i, batch) in enumerate(Iterators.partition(sequences, batch_size))
+            start = (i - 1) * batch_size + 1
+            stop = start + min(batch_size, length(batch)) - 1
+            @inbounds embeddings[:, start:stop] = _embed(embedder, batch)
+        end
+    else
+        embeddings = _embed(embedder, _format.(sequences))
+    end
+
+    embeddings
+end
+
+@inline _format(sequence::String) = ("", sequence)

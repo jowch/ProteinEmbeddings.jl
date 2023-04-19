@@ -1,4 +1,3 @@
-using BioSequences
 using ProteinEmbeddings
 using Test
 
