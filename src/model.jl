@@ -77,12 +77,16 @@ end
 @inline (model::ProteinEmbedder)(xs...; kwargs...) = _embed(model, xs...; kwargs...)
 
 """
-    embed(model::ProteinEmbedder, x)
+    embed(model::ProteinEmbedder, x; batch_size)
 
 Computes an embedding using the `model`. Input `x` can be any string-like type
 or array of string-like types. If `x` is a single sequence, the embedding is
 returned as a vector. If `x` is an array of `n` sequences, the embedding is returned
-as an d x `n` matrix of embeddings.
+as an d x `n` matrix of embeddings. The `batch_size` keyword argument can be used
+to control the number of sequences to process at a time. This is useful for large
+arrays of sequences, where the memory usage can be controlled by setting a smaller
+batch size. The default batch size is 500. The `batch_size` keyword argument is
+ignored if `x` is a single sequence.
 """
 @inline embed(model::ProteinEmbedder, xs...; kwargs...) = _embed(model, xs...; kwargs...)
 
