@@ -61,6 +61,25 @@ targets = [
 embeddings = embed(model, targets)  # => 2560 x 4 Matrix
 ```
 
+### BioSequences
+
+One can also produce embeddings for `AminoAcid` sequences from
+[BioSequences.jl](https://github.com/BioJulia/BioSequences.jl) by loading the
+`BioSequences` package alongside `ProteinEmbeddings`.
+
+```julia
+using BioSequences
+using ProteinEmbeddings
+
+target = aa"LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES"
+
+model = ProteinEmbedder(ESM2_T36_3B_UR50D)
+# or, equivalently,
+# model = ProteinEmbedder{ESM2_T36_3B_UR50D}()
+
+embedding = embed(model, target) # => 2560 dim Vector
+```
+
 ### Available Models
 
 The list of available models can be found at the top of the
