@@ -1,7 +1,7 @@
 name = "ProteinEmbeddings"
 uuid = "a7927cc2-2358-47e8-a213-49500dd82299"
 authors = ["Jonathan Chen <jwhc@ucla.edu>"]
-version = "0.4.0"
+version = "0.4.1"
 
 [deps]
 Conda = "8f4d0f93-b110-5947-807f-2305c1781a2d"
