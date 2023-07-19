@@ -17,8 +17,8 @@ end
     LL37 = "LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES"
     aaLL37 = LongAA(LL37)
 
-    y = load("ll37.jld2", "LL37")
-    y_33 = y[33:33, :, :]  # 1 x 1280 x 1
+    y = load("ll37.jld2", "LL37")  # layers 0-33; 0 is input embedding
+    y_33 = y[(33 + 1):(33 + 1), :, :]  # 1 x 1280 x 1
 
     # default layer is 33
     @test all(isapprox.(y_33, embed(embedder, LL37); atol = 1f-4))
@@ -33,5 +33,5 @@ end
     @test all(isapprox.(Y, embedder([LL37, aaLL37]); atol = 1f-4))
 
     # check all layers
-    @test all(isapprox.(y, embed(embedder, LL37; layers = 1:modeldepth(model_type)); atol = 1f-4))
+    @test all(isapprox.(y, embed(embedder, LL37; layers = 0:modeldepth(model_type)); atol = 1f-4))
 end

@@ -105,7 +105,7 @@ ignored if `x` is a single sequence.
 @inline embed(model::ProteinEmbedder, x; kwargs...) = _embed(model, x; kwargs...)
 
 function _embed(embedder::ProteinEmbedder{M}, sequences::Vector{String}; layers = [modeldepth(M)]) where {M <: Model}
-    @assert all(1 .<= layers .<= modeldepth(M)) "Requires 1 <= layer <= $(modeldepth(M))"
+    @assert all(0 .<= layers .<= modeldepth(M)) "Requires 1 <= layer <= $(modeldepth(M))"
     embedder.model.embed(sequences, layers)
 end
 
