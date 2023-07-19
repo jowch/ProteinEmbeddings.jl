@@ -11,7 +11,7 @@ const ESM2 = ESM2_T33_650M_UR50D
 """
     modelname(M <: Model)
 
-Returns the name of the model represented by the type `M` in python.
+Returns the name of the model represented by the type `M`.
 """
 @inline modelname(::Type{ESM1B_T33_650M_UR50S}) = "esm1b_t33_650M_UR50S" 
 @inline modelname(::Type{ESM2_T33_650M_UR50D}) = "esm2_t33_650M_UR50D"
@@ -21,12 +21,23 @@ Returns the name of the model represented by the type `M` in python.
 """
     modeldims(M <: Model)
 
-Returns the embedding dimension of the model represented by the type `M` in python.
+Returns the embedding dimension of the model represented by the type `M`.
 """
 @inline modeldims(::Type{ESM1B_T33_650M_UR50S}) = 1280
 @inline modeldims(::Type{ESM2_T33_650M_UR50D}) = 1280
 @inline modeldims(::Type{ESM2_T36_3B_UR50D}) = 2560
 @inline modeldims(::Type{ESM2_T48_15B_UR50D}) = 5120
+
+"""
+    modeldepth(M <: Model)
+
+Returns the number of layers in the model represented by the type `M`.
+"""
+@inline modeldepth(::Type{ESM1B_T33_650M_UR50S}) = 33
+@inline modeldepth(::Type{ESM2_T33_650M_UR50D}) = 33
+@inline modeldepth(::Type{ESM2_T36_3B_UR50D}) = 36
+@inline modeldepth(::Type{ESM2_T48_15B_UR50D}) = 48
+
 
 """
     ProteinEmbedder{<:Model}()
@@ -76,6 +87,9 @@ end
 
 @inline (model::ProteinEmbedder)(xs...; kwargs...) = _embed(model, xs...; kwargs...)
 
+# TODO: batching should be done on the python side
+# TODO: add support for an arbitrary list of embedding layers
+
 """
     embed(model::ProteinEmbedder, x; batch_size)
 
@@ -88,32 +102,15 @@ arrays of sequences, where the memory usage can be controlled by setting a small
 batch size. The default batch size is 500. The `batch_size` keyword argument is
 ignored if `x` is a single sequence.
 """
-@inline embed(model::ProteinEmbedder, xs...; kwargs...) = _embed(model, xs...; kwargs...)
+@inline embed(model::ProteinEmbedder, x; kwargs...) = _embed(model, x; kwargs...)
 
-function _embed(embedder::ProteinEmbedder, sequence::AbstractVector{Tuple{String, String}})
-    embedder.model.embed(sequence)
+function _embed(embedder::ProteinEmbedder{M}, sequences::Vector{String}; layers = [modeldepth(M)]) where {M <: Model}
+    @assert all(1 .<= layers .<= modeldepth(M)) "Requires 1 <= layer <= $(modeldepth(M))"
+    embedder.model.embed(sequences, layers)
 end
 
-@inline _embed(embedder::ProteinEmbedder, xs...; kwargs...) = _embed(embedder, collect(xs); kwargs...)
-@inline _embed(embedder::ProteinEmbedder, sequence) =
-    _embed(embedder, [_format(sequence)])[:, 1]
+@inline _embed(embedder::ProteinEmbedder, sequence; kwargs...) = _embed(embedder, [_format(sequence)]; kwargs...)
+@inline _embed(embedder::ProteinEmbedder, sequences::AbstractVector; kwargs...) =
+    _embed(embedder, vec(_format.(sequences)); kwargs...)
 
-function _embed(embedder::ProteinEmbedder{M}, sequences::AbstractVector; batch_size = 500) where {M<:Model}
-    # if there are more sequences than the batch size, we need to split the
-    # sequences into batches and process each batch separately
-    if length(sequences) > batch_size
-        embeddings = Array{Float32}(undef, modeldims(M), length(sequences))
-
-        for (i, batch) in enumerate(Iterators.partition(sequences, batch_size))
-            start = (i - 1) * batch_size + 1
-            stop = start + min(batch_size, length(batch)) - 1
-            @inbounds embeddings[:, start:stop] = _embed(embedder, batch)
-        end
-    else
-        embeddings = _embed(embedder, _format.(sequences))
-    end
-
-    embeddings
-end
-
-@inline _format(sequence::String) = ("", sequence)
+@inline _format(sequence::AbstractString) = string(sequence)

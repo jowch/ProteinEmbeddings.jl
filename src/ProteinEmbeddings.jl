@@ -16,7 +16,7 @@ ESM2_T36_3B_UR50D,
 ESM2_T48_15B_UR50D,
 
 # embedder
-ProteinEmbedder, embed, show
+ProteinEmbedder, embed, show, modelname, modeldims, modeldepth
 
 
 include("model.jl")
@@ -29,6 +29,8 @@ function __init__()
 
     from typing import List, Optional
 
+
+    TRUNCATION_SEQ_LENGTH = 1022
     
     class Embedder:
         def __init__(self, model: str):
@@ -36,47 +38,87 @@ function __init__()
                 self.model, self.alphabet = esm.pretrained.esm1b_t33_650M_UR50S()
                 self.batch_converter = self.alphabet.get_batch_converter()
                 self.embedding_dims = 1280
-                self.embedding_layer = 33
+                self.default_embedding_layer = 33
             elif model == "esm2_t33_650M_UR50D":
                 self.model, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
                 self.batch_converter = self.alphabet.get_batch_converter()
                 self.embedding_dims = 1280
-                self.embedding_layer = 33
+                self.default_embedding_layer = 33
             elif model == "esm2_t36_3B_UR50D":
                 self.model, self.alphabet = esm.pretrained.esm2_t36_3B_UR50D()
                 self.batch_converter = self.alphabet.get_batch_converter()
                 self.embedding_dims = 2560
-                self.embedding_layer = 36
+                self.default_embedding_layer = 36
             elif model == "esm2_t48_15B_UR50D":
                 self.model, self.alphabet = esm.pretrained.esm2_t48_15B_UR50D()
                 self.batch_converter = self.alphabet.get_batch_converter()
                 self.embedding_dims = 5120
-                self.embedding_layer = 48
+                self.default_embedding_layer = 48
 
+            self.embedding_types = ["mean", "per_tok"]
             self.device = "cpu"
             self.model.eval()
 
-        def embed(self, seqs: List[str]):
-            batch_labels, batch_strs, batch_tokens = self.batch_converter(seqs)
-            batch_lens = (batch_tokens != self.alphabet.padding_idx).sum(1)
+        def _embed(
+                self,
+                seqs: List[str], repr_layers: List[int], include: List[str] = ["mean"],
+                toks_per_batch = 4096, extra_toks_per_seq = 1, truncation_seq_length = 1022
+            ):
+            # Adapted from esm/scripts/extract.py
+            assert all(-(self.model.num_layers + 1) <= i <= self.model.num_layers for i in repr_layers)
+            repr_layers = [(i + self.model.num_layers + 1) % (self.model.num_layers + 1) for i in repr_layers]
 
-            # Extract per-residue representations (on CPU)
+            dataset = esm.FastaBatchedDataset(range(len(seqs)), seqs)
+            batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=extra_toks_per_seq)
+            data_loader = torch.utils.data.DataLoader(
+                dataset, collate_fn=self.batch_converter, batch_sampler=batches
+            )
+
+            results = [None] * len(seqs)
+
             with torch.no_grad():
-                results = self.model(
-                    batch_tokens,
-                    repr_layers=[self.embedding_layer],
-                    return_contacts=False
-                )
+                for batch_idx, (labels, strs, toks) in enumerate(data_loader):
+                    # if torch.cuda.is_available() and not args.nogpu:
+                    #     toks = toks.to(device="cuda", non_blocking=True)
+        
+                    out = self.model(toks, repr_layers=repr_layers, return_contacts=False)
+        
+                    logits = out["logits"].to(device="cpu")
+                    representations = {
+                        layer: t.to(device="cpu") for layer, t in out["representations"].items()
+                    }
+        
+                    for i, label in enumerate(labels):
+                        truncate_len = min(truncation_seq_length, len(strs[i]))
+                        # Call clone on tensors to ensure tensors are not views into a larger representation
+                        # See https://github.com/pytorch/pytorch/issues/1995
+                        result = {}
 
-            token_representations = results["representations"][self.embedding_layer].numpy()
+                        if "per_tok" in include:
+                            result["representations"] = {
+                                layer: t[i, 1 : truncate_len + 1].clone().numpy()
+                                for layer, t in representations.items()
+                            }
+                        if "mean" in include:
+                            # Generate per-sequence representations via averaging
+                            # NOTE: token 0 is always a beginning-of-sequence token, so the
+                            # first residue is token 1.
+                            result["mean_representations"] = {
+                                layer: t[i, 1 : truncate_len + 1].mean(0).clone().numpy()
+                                for layer, t in representations.items()
+                            }
 
-            # Generate per-sequence representations via averaging
-            # NOTE: token 0 is always a beginning-of-sequence token, so the
-            # first residue is token 1.
-            representations = np.zeros((self.embedding_dims, len(seqs)))
+                        results[int(label)] = result
 
-            for i, tokens_len in enumerate(batch_lens):
-                representations[:, i] = token_representations[i, 1 : tokens_len - 1].mean(0)
+            return results
+
+        def embed(self, seqs: List[str], layers: List[int], include: List[str] = ["mean"]):
+            results = self._embed(seqs, repr_layers=layers, include=include)
+            representations = np.zeros((len(layers), self.embedding_dims, len(seqs)))
+
+            for i, layer in enumerate(layers):
+                for j, result in enumerate(results):
+                    representations[i, :, j] = result["mean_representations"][layer]
 
             return representations
     """
